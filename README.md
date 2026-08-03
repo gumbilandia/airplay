@@ -6,15 +6,25 @@ Jugable directamente en el navegador, sin necesidad de instalar nada.
 
 ## 🎮 Cómo jugar
 
-- **Clic / toque en la pantalla / ESPACIO** → volar y disparar a la vez
-- **Flechas del teclado** → control direccional libre:
-  - `↑` subir
-  - `↓` bajar
-  - `←` retroceder
-  - `→` avanzar
-- **Tecla `X`** → disparar (sin volar)
-- **Botón ⏸ / tecla `P` / `Escape`** → pausar la partida
-- Botones en pantalla `VOLAR` y `🔫` → controles táctiles para celular
+- **Clic, toque en la pantalla o `ESPACIO`** → hace volar al avioncito hacia arriba (como el Flappy Bird clásico). Si no lo tocas, el avión cae por su propio peso.
+- **Flechas del teclado `↑ ↓ ← →`** → dan un impulso extra en cualquier dirección (subir más, bajar más rápido, retroceder o avanzar).
+- **En celular: deslizar el dedo** hacia arriba, abajo, izquierda o derecha → da el mismo impulso extra que las flechas (puedes deslizar en diagonal para combinar dos direcciones).
+- **Mantener presionado (clic, toque o ESPACIO)** → disparo continuo con el arma seleccionada.
+- **Tecla `X`** → disparo individual.
+- **Tecla `Q` o `Tab`** → cambiar de arma.
+- **Botón ⏸ / tecla `P` / `Escape`** → pausar la partida.
+- Hay dos zonas invisibles en las esquinas inferiores de la pantalla (sin íconos visibles) para jugar desde el celular: la izquierda cambia de arma y la derecha dispara mientras la mantengas presionada.
+
+### 🔫 Armas (estilo nave espacial, tipo Axelay)
+
+El avioncito tiene 4 tipos de disparo, todos con su propio efecto de sonido:
+
+1. **Vulcán** — disparo rápido y directo, ideal para uso constante.
+2. **Misiles Múltiples** — dispara 3 misiles en abanico que, tras un instante, giran y persiguen al enemigo más cercano.
+3. **Láser** — un haz que atraviesa y daña a varios enemigos en línea recta sin detenerse.
+4. **Onda Difusora** — una ráfaga de 5 disparos en forma de abanico, cubre un área más amplia.
+
+Cada disparo, impacto e explosión tiene su propio efecto de sonido generado en tiempo real (sin archivos de audio externos), incluyendo el sonido del choque al perder la partida.
 
 No hay niveles ni mundos distintos: es un solo escenario infinito. Cada 10 puntos aparece una nave enemiga más resistente que da puntos extra si la derribas. La dificultad sube poco a poco mientras más puntos consigues.
 

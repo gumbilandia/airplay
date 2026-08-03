@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Avioncito de Papel</title>
+
+<!-- PWA: instala como app en Android -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#8ec9f0">
+<meta name="background_color" content="#0b0c14">
+
+<!-- PWA: pantalla completa como app en iPhone (Safari / Add to Home Screen) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Avioncito">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+<!-- Iconos -->
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #0b0c14;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    touch-action: none;
+  }
+  #wrap {
+    position: relative; width: 100vw; height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #stage {
+    position: relative;
+    width: 100%; height: 100%;
+  }
+  canvas {
+    display: block; width: 100%; height: 100%;
+    background: #87CEEB;
+    cursor: pointer;
+  }
+  .btn {
+    position: absolute;
+    bottom: calc(22px + env(safe-area-inset-bottom));
+    width: 90px; height: 90px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: transparent;
+    font-size: 0;
+    z-index: 20;
+  }
+  #shootBtn { right: calc(10px + env(safe-area-inset-right)); }
+  #flapBtn { left: calc(10px + env(safe-area-inset-left)); }
+  #hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    padding: calc(10px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 10px calc(14px + env(safe-area-inset-left));
+    display: flex; justify-content: space-between; align-items: flex-start;
+    pointer-events: none;
+    z-index: 15;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+  }
+  #hud .block { font-size: 13px; line-height: 1.5; }
+  #hud .big { font-size: 26px; }
+  #overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(5,8,20,0.82);
+    color: #fff; text-align: center; z-index: 30;
+    padding: 24px;
+  }
+  #overlay h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: 1px; }
+  #overlay h2 { font-size: 18px; margin: 0 0 18px; font-weight: 400; color: #ffd27a; }
+  #overlay p { font-size: 14px; color: #cfd6e6; margin: 4px 0; max-width: 340px; line-height: 1.5; }
+  #overlay button {
+    margin-top: 20px;
+    padding: 12px 30px;
+    font-size: 15px;
+    font-weight: 700;
+    border-radius: 30px;
+    border: none;
+    background: linear-gradient(135deg,#ffb347,#ff5f6d);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(255,95,109,0.4);
+  }
+  #overlay button:active { transform: scale(0.96); }
+  .hidden { display: none !important; }
+  #pauseBtn {
+    position: absolute; top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right));
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.6);
+    background: rgba(20,20,30,0.55);
+    color: #fff; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 25; cursor: pointer;
+  }
+  #pauseOverlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(5,8,20,0.72);
+    color: #fff; text-align: center; z-index: 28;
+  }
+  #pauseOverlay h2 { font-size: 26px; margin: 0 0 16px; letter-spacing: 2px; }
+  #pauseOverlay button {
+    margin: 6px 0;
+    padding: 10px 30px;
+    font-size: 14px; font-weight: 700;
+    border-radius: 24px; border: none;
+    cursor: pointer;
+  }
+  #resumeBtn { background: linear-gradient(135deg,#6ee787,#2ec4b6); color: #06231a; }
+  #quitBtn { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.4) !important; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <canvas id="game"></canvas>
+
+    <div id="hud">
+      <div class="block">Puntos<br><span class="big" id="scoreNum">0</span></div>
+      <div class="block" style="text-align:center">Arma<br><span class="big" id="weaponName" style="font-size:15px">Vulcán</span></div>
+      <div class="block" style="text-align:right">Mejor puntuación<br><span class="big" id="bestNum">0</span></div>
+    </div>
+
+    <button id="flapBtn" class="btn" title="Cambiar arma"></button>
+    <button id="shootBtn" class="btn" title="Disparar"></button>
+    <button id="pauseBtn">⏸</button>
+
+    <div id="pauseOverlay" class="hidden">
+      <h2>PAUSA</h2>
+      <button id="resumeBtn">CONTINUAR</button>
+      <button id="quitBtn">REINICIAR PARTIDA</button>
+    </div>
+
+    <div id="overlay">
+      <h1 id="ovTitle">Avioncito de Papel</h1>
+      <h2 id="ovSubtitle">Modo Infinito</h2>
+      <p id="ovText">
+        Toca la pantalla, haz clic o pulsa ESPACIO para volar (el avión sube; si no tocas, cae solo).<br>
+        Usa las flechas ↑ ↓ ← → para un impulso extra en cualquier dirección.<br>
+        En celular, desliza el dedo hacia arriba, abajo, izquierda o derecha para moverlo igual que con las flechas.<br>
+        Tecla <b>Q</b> o el borde izquierdo = cambiar de arma.<br>
+        Hay 4 armas estilo nave espacial: Vulcán, Misiles Múltiples, Láser y Onda Difusora.<br>
+        Esquiva los tubos y las naves enemigas. Sin niveles ni mundos: vuela sin parar y supera tu mejor puntuación.
+      </p>
+      <button id="ovBtn">JUGAR</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const stage = document.getElementById('stage');
+
+  let W = 480, H = 720;
+  let scaleF = 1;
+
+  const overlay = document.getElementById('overlay');
+  const ovTitle = document.getElementById('ovTitle');
+  const ovSubtitle = document.getElementById('ovSubtitle');
+  const ovText = document.getElementById('ovText');
+  const ovBtn = document.getElementById('ovBtn');
+  const scoreNum = document.getElementById('scoreNum');
+  const bestNum = document.getElementById('bestNum');
+  const weaponNameEl = document.getElementById('weaponName');
+  const flapBtn = document.getElementById('flapBtn');
+  const shootBtn = document.getElementById('shootBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const pauseOverlay = document.getElementById('pauseOverlay');
+  const resumeBtn = document.getElementById('resumeBtn');
+  const quitBtn = document.getElementById('quitBtn');
+
+  // ---------- Single unchanging world/theme ----------
+  const THEME = {
+    sky: ["#8ec9f0", "#dff3ff"],
+    obstacle: "#5b8c5a",
+    obstacleDark: "#3d6b3d",
+    accent: "#ffffff"
+  };
+
+  // ---------- AUDIO: efectos de sonido sintetizados (sin archivos externos) ----------
+  let audioCtx = null;
+  function ensureAudio(){
+    if(!audioCtx){
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch(e){ return; }
+    }
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  function tone({freq=440, dur=0.12, type='sine', vol=0.2, freqEnd=null, delay=0}){
+    if(!audioCtx) return;
+    const t0 = audioCtx.currentTime + delay;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if(freqEnd) osc.frequency.exponentialRampToValueAtTime(Math.max(freqEnd,1), t0+dur);
+    gain.gain.setValueAtTime(vol, t0);
+    gain.gain.exponentialRampToValueAtTime(0.001, t0+dur);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t0); osc.stop(t0+dur+0.02);
+  }
+  function noiseBurst({dur=0.3, vol=0.3, freq=900}){
+    if(!audioCtx) return;
+    const bufferSize = Math.max(1, Math.floor(audioCtx.sampleRate*dur));
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<bufferSize;i++){ data[i] = (Math.random()*2-1) * (1 - i/bufferSize); }
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass'; filter.frequency.value = freq;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+dur);
+    noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+    noise.start();
+  }
+  const sfx = {
+    vulcan:   () => tone({freq:880, dur:0.07, type:'square', vol:0.14, freqEnd:520}),
+    missile:  () => tone({freq:220, dur:0.28, type:'sawtooth', vol:0.16, freqEnd:70}),
+    laser:    () => tone({freq:1500, dur:0.2, type:'sawtooth', vol:0.11, freqEnd:850}),
+    spread:   () => { for(let i=0;i<3;i++) tone({freq:700+i*90, dur:0.09, type:'square', vol:0.09, delay:i*0.02}); },
+    hit:      () => tone({freq:320, dur:0.08, type:'square', vol:0.14, freqEnd:130}),
+    explosion:() => { noiseBurst({dur:0.35, vol:0.32, freq:1300}); tone({freq:150, dur:0.25, type:'sawtooth', vol:0.15, freqEnd:50}); },
+    crash:    () => { noiseBurst({dur:0.6, vol:0.38, freq:400}); tone({freq:220, dur:0.6, type:'sawtooth', vol:0.2, freqEnd:35}); },
+    switchWeapon: () => tone({freq:520, dur:0.06, type:'triangle', vol:0.12, freqEnd:920}),
+  };
+
+  // ---------- WEAPONS: 4 tipos estilo nave espacial (Axelay) ----------
+  const WEAPONS = [
+    { id:'vulcan',  name:'Vulcán',            color:'#ffe45c', cooldown:9  },
+    { id:'missile', name:'Misiles Múltiples', color:'#ff8a3d', cooldown:26 },
+    { id:'laser',   name:'Láser',             color:'#7CFC9A', cooldown:20 },
+    { id:'spread',  name:'Onda Difusora',     color:'#c78bff', cooldown:22 },
+  ];
+  let weaponIndex = 0;
+  function currentWeapon(){ return WEAPONS[weaponIndex]; }
+  function switchWeapon(dir){
+    weaponIndex = (weaponIndex + dir + WEAPONS.length) % WEAPONS.length;
+    sfx.switchWeapon();
+    weaponNameEl.textContent = currentWeapon().name;
+    weaponNameEl.style.color = currentWeapon().color;
+  }
+
+  const MOVE_SPEED = 4.6; // ajuste extra de movimiento por flechas/deslizamiento
+  const GRAVITY = 0.45;
+  const FLAP = -7.6;
+
+  // ---------- GAME STATE ----------
+  let state = 'menu'; // menu, playing, dead
+  let paused = false;
+  let score = 0;
+  let best = 0;
+  let frame = 0;
+
+  let plane = { x: 0, y: 0, vy: 0, rot: 0 };
+  let obstacles = [];
+  let enemies = [];
+  let toughEnemies = [];
+  let bullets = [];
+  let enemyBullets = [];
+  let particles = [];
+  let shootCooldown = 0;
+  let hitFlash = 0;
+  let nextToughAt = 10;
+  let minPlaneX = 40, maxPlaneX = 200; // updated on resize based on screen width
+  const keys = { up:false, down:false, left:false, right:false }; // arrow key directional control
+  let firing = false;    // true while fire is held (click, tap, or Space)
+  let dragging = false;  // true while a finger/mouse is down on the canvas
+  let touchStartX = 0, touchStartY = 0; // origin point of the current swipe
+
+  function resizeCanvas(){
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const cw = stage.clientWidth, ch = stage.clientHeight;
+    W = cw; H = ch;
+    canvas.width = Math.round(cw * dpr);
+    canvas.height = Math.round(ch * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    scaleF = Math.max(0.55, Math.min(1.7, Math.min(W, H) / 480));
+    plane.x = W * 0.22;
+    minPlaneX = W * 0.08;
+    maxPlaneX = W * 0.5;
+    if(plane.y > H) plane.y = H/2;
+  }
+  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 150));
+
+  // ---------- Continuous difficulty scaling with score (no discrete levels) ----------
+  function difficulty(sc){
+    return {
+      obstacleSpeed: Math.min(7.2, 2.6 + sc * 0.045),
+      gap: Math.max(150, 260 - sc * 1.3) * scaleF,
+      spawnInterval: Math.max(72, 145 - sc * 0.9),
+      enemyChance: Math.min(0.03, 0.005 + sc * 0.0006),
+      enemyBulletSpeed: Math.min(7.5, 3 + sc * 0.045),
+    };
+  }
+
+  function resetRun(){
+    score = 0;
+    obstacles = [];
+    enemies = [];
+    toughEnemies = [];
+    bullets = [];
+    enemyBullets = [];
+    particles = [];
+    plane.x = W * 0.22; plane.y = H/2; plane.vy = 0; plane.rot = 0;
+    frame = 0;
+    hitFlash = 0;
+    lastSpawn = 0;
+    nextToughAt = 10;
+    scoreNum.textContent = 0;
+    bestNum.textContent = best;
+  }
+
+  function startGame(){
+    ensureAudio();
+    resetRun();
+    state = 'playing';
+    paused = false;
+    pauseOverlay.classList.add('hidden');
+    overlay.classList.add('hidden');
+    weaponNameEl.textContent = currentWeapon().name;
+    weaponNameEl.style.color = currentWeapon().color;
+  }
+
+  function showOverlay(title, subtitle, text, btnLabel){
+    ovTitle.textContent = title;
+    ovSubtitle.textContent = subtitle;
+    ovText.innerHTML = text;
+    ovBtn.textContent = btnLabel;
+    overlay.classList.remove('hidden');
+  }
+
+  function gameOver(){
+    state = 'dead';
+    sfx.crash();
+    if(score > best){ best = score; bestNum.textContent = best; }
+    showOverlay(
+      '¡Te estrellaste!',
+      'Puntuación: ' + score + (score === best && score > 0 ? '  ·  ¡Nuevo récord!' : ''),
+      'Mejor puntuación de esta sesión: ' + best + '.<br>Vuela de nuevo y trata de superarla.',
+      'VOLAR DE NUEVO'
+    );
+  }
+
+  // ---------- PAUSE ----------
+  function togglePause(){
+    if(state !== 'playing') return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? '▶' : '⏸';
+    pauseOverlay.classList.toggle('hidden', !paused);
+  }
+  pauseBtn.addEventListener('pointerdown', (e)=>{ e.stopPropagation(); togglePause(); });
+  resumeBtn.addEventListener('pointerdown', (e)=>{ e.stopPropagation(); togglePause(); });
+  quitBtn.addEventListener('pointerdown', (e)=>{ e.stopPropagation(); paused = false; pauseBtn.textContent='⏸'; pauseOverlay.classList.add('hidden'); startGame(); });
+
+  // ---------- INPUT: flechas mueven el avión (sin caída), clic/toque/ESPACIO disparan ----------
+  function shoot(){
+    if(state !== 'playing' || paused) return;
+    if(shootCooldown > 0) return;
+    const w = currentWeapon();
+    shootCooldown = w.cooldown;
+    const ox = plane.x + 26*scaleF, oy = plane.y;
+    if(w.id === 'vulcan'){
+      bullets.push({ x:ox, y:oy, vx:10, vy:0, type:'vulcan' });
+      sfx.vulcan();
+    } else if(w.id === 'missile'){
+      [-0.35, 0, 0.35].forEach(a => {
+        bullets.push({ x:ox, y:oy, vx:Math.cos(a)*6.2, vy:Math.sin(a)*6.2, type:'missile', age:0 });
+      });
+      sfx.missile();
+    } else if(w.id === 'laser'){
+      bullets.push({ x:ox, y:oy, vx:16, vy:0, type:'laser', pierce:true });
+      sfx.laser();
+    } else if(w.id === 'spread'){
+      [-0.4, -0.2, 0, 0.2, 0.4].forEach(a => {
+        bullets.push({ x:ox, y:oy, vx:Math.cos(a)*9, vy:Math.sin(a)*9, type:'spread' });
+      });
+      sfx.spread();
+    }
+  }
+
+  function flap(){
+    if(state !== 'playing' || paused) return;
+    plane.vy = FLAP;
+  }
+
+  // Deslizar el dedo (o el mouse) hacia arriba/abajo/izquierda/derecha da un impulso extra
+  // al avioncito en esa dirección, igual que las flechas del teclado, mientras el dedo se mantenga desplazado.
+  const SWIPE_THRESHOLD = 16; // px que hay que desplazar antes de activar el impulso
+  function updateSwipe(clientX, clientY){
+    const rect = canvas.getBoundingClientRect();
+    const x = clientX - rect.left, y = clientY - rect.top;
+    const dx = x - touchStartX, dy = y - touchStartY;
+    keys.right = dx > SWIPE_THRESHOLD;
+    keys.left  = dx < -SWIPE_THRESHOLD;
+    keys.down  = dy > SWIPE_THRESHOLD;
+    keys.up    = dy < -SWIPE_THRESHOLD;
+  }
+  function clearSwipe(){
+    dragging = false; firing = false;
+    keys.up = keys.down = keys.left = keys.right = false;
+  }
+  function startSwipe(e){
+    const rect = canvas.getBoundingClientRect();
+    touchStartX = e.clientX - rect.left;
+    touchStartY = e.clientY - rect.top;
+    dragging = true; firing = true;
+    flap();  // tocar la pantalla también hace volar al avioncito (como el Flappy Bird clásico)
+    shoot();
+  }
+
+  canvas.addEventListener('pointerdown', (e)=>{
+    if(state === 'menu') return;
+    startSwipe(e);
+  });
+  canvas.addEventListener('pointermove', (e)=>{ if(dragging) updateSwipe(e.clientX, e.clientY); });
+  canvas.addEventListener('pointerup', clearSwipe);
+  canvas.addEventListener('pointerleave', clearSwipe);
+  canvas.addEventListener('pointercancel', clearSwipe);
+
+  // botón invisible izquierdo = cambiar de arma; botón invisible derecho = disparar sostenido
+  flapBtn.addEventListener('pointerdown', (e)=>{ e.stopPropagation(); switchWeapon(1); });
+  shootBtn.addEventListener('pointerdown', (e)=>{ e.stopPropagation(); firing = true; });
+  shootBtn.addEventListener('pointerup', (e)=>{ e.stopPropagation(); firing = false; });
+  shootBtn.addEventListener('pointerleave', (e)=>{ e.stopPropagation(); firing = false; });
+
+  window.addEventListener('keydown', (e)=>{
+    if(e.code === 'Space'){ e.preventDefault(); if(!e.repeat){ flap(); shoot(); } firing = true; }
+    if(e.code === 'KeyX'){ e.preventDefault(); shoot(); }
+    if(e.code === 'KeyQ' || e.code === 'Tab'){ e.preventDefault(); switchWeapon(1); }
+    if(e.code === 'KeyP' || e.code === 'Escape'){ e.preventDefault(); togglePause(); }
+    if(e.code === 'ArrowUp'){ e.preventDefault(); keys.up = true; }
+    if(e.code === 'ArrowDown'){ e.preventDefault(); keys.down = true; }
+    if(e.code === 'ArrowLeft'){ e.preventDefault(); keys.left = true; }
+    if(e.code === 'ArrowRight'){ e.preventDefault(); keys.right = true; }
+  });
+  window.addEventListener('keyup', (e)=>{
+    if(e.code === 'Space') firing = false;
+    if(e.code === 'ArrowUp') keys.up = false;
+    if(e.code === 'ArrowDown') keys.down = false;
+    if(e.code === 'ArrowLeft') keys.left = false;
+    if(e.code === 'ArrowRight') keys.right = false;
+  });
+  // si la ventana pierde el foco, soltar todas las teclas para que el avión no quede moviéndose solo
+  window.addEventListener('blur', ()=>{ keys.up = keys.down = keys.left = keys.right = false; firing = false; dragging = false; });
+
+  ovBtn.onclick = () => { startGame(); };
+
+  // ---------- SPAWN ----------
+  function spawnObstacle(){
+    const d = difficulty(score);
+    const gap = Math.min(d.gap, H * 0.62);
+    const margin = Math.max(40, H * 0.1);
+    const gapY = margin + Math.random() * Math.max(20, H - margin*2 - gap);
+    obstacles.push({ x: W + 40, gapY, gap, passed:false, w: 62 * scaleF });
+  }
+
+  function spawnEnemy(){
+    const y = H*0.1 + Math.random()*(H*0.8);
+    enemies.push({ x: W+30, y, vy: (Math.random()-0.5)*1.4, hp: 1, shootTimer: 60+Math.random()*60 });
+  }
+
+  // Milestone "tough enemy" every 10 points - optional bonus target, tougher as score grows
+  function spawnToughEnemy(){
+    const hp = 3 + Math.floor(score / 10);
+    toughEnemies.push({
+      x: W + 60, y: H*0.5, vy: 1.4, hp, maxHp: hp,
+      shootTimer: 55, entering: true
+    });
+  }
+
+  function spawnParticle(){
+    particles.push({ x: W+10, y: Math.random()*H, size: 3+Math.random()*10 });
+  }
+
+  // ---------- MAIN LOOP ----------
+  let lastSpawn = 0;
+  function update(){
+    if(state !== 'playing' || paused) return;
+    frame++;
+    const d = difficulty(score);
+
+    // física con gravedad: el avión cae solo y sube al tocar/pulsar para volar (flap)
+    plane.vy += GRAVITY;
+    if(plane.vy > 11) plane.vy = 11;
+    plane.y += plane.vy;
+    plane.rot = Math.max(-0.5, Math.min(1.1, plane.vy * 0.09));
+
+    // flechas del teclado o deslizamiento táctil dan un impulso extra en cualquier dirección
+    if(keys.up)    plane.vy = Math.max(-8, plane.vy - 0.9);
+    if(keys.down)  plane.vy = Math.min(11, plane.vy + 0.9);
+    if(keys.left)  plane.x = Math.max(minPlaneX, plane.x - 3.2 * scaleF);
+    if(keys.right) plane.x = Math.min(maxPlaneX, plane.x + 3.2 * scaleF);
+
+    const edge = 14 * scaleF;
+    plane.x = Math.max(minPlaneX, Math.min(maxPlaneX, plane.x));
+    if(plane.y < edge){ plane.y = edge; plane.vy = 0; }
+    if(plane.y > H - edge){ plane.y = H - edge; gameOver(); return; }
+
+    if(firing) shoot();
+
+    if(hitFlash > 0) hitFlash--;
+    if(shootCooldown > 0) shootCooldown--;
+
+    // background clouds (single unchanging world)
+    if(frame % 14 === 0) spawnParticle();
+    particles.forEach(p => p.x -= 1.1);
+    particles = particles.filter(p => p.x > -20);
+
+    // spawn obstacles endlessly, one after another, at random gap position
+    lastSpawn++;
+    if(lastSpawn > d.spawnInterval){
+      lastSpawn = 0;
+      spawnObstacle();
+    }
+    if(Math.random() < d.enemyChance) spawnEnemy();
+
+    // milestone tough enemy every 10 points
+    if(score >= nextToughAt){
+      spawnToughEnemy();
+      nextToughAt += 10;
+    }
+
+    // move + collide obstacles
+    obstacles.forEach(o => o.x -= d.obstacleSpeed);
+    obstacles = obstacles.filter(o => o.x > -80);
+
+    let crashed = false;
+    obstacles.forEach(o => {
+      if(!o.passed && o.x + o.w < plane.x){
+        o.passed = true;
+        score++;
+        scoreNum.textContent = score;
+      }
+      const px = plane.x, py = plane.y, pr = 13 * scaleF;
+      if(px+pr > o.x && px-pr < o.x+o.w){
+        if(py-pr < o.gapY || py+pr > o.gapY + o.gap){
+          crashed = true;
+        }
+      }
+    });
+
+    // enemies
+    enemies.forEach(en => {
+      en.x -= d.obstacleSpeed + 0.6;
+      en.y += en.vy;
+      if(en.y < 30 || en.y > H-30) en.vy *= -1;
+      en.shootTimer--;
+      if(en.shootTimer <= 0 && en.x < W-20 && en.x > 40){
+        en.shootTimer = 90 + Math.random()*70;
+        const ang = Math.atan2(plane.y - en.y, plane.x - en.x);
+        enemyBullets.push({ x: en.x, y: en.y, vx: Math.cos(ang)*d.enemyBulletSpeed, vy: Math.sin(ang)*d.enemyBulletSpeed });
+      }
+      if(Math.hypot(en.x-plane.x, en.y-plane.y) < 24*scaleF) { crashed = true; en.hp = 0; }
+    });
+    bullets.forEach(b => {
+      enemies.forEach(en => {
+        if(en.hp > 0 && Math.hypot(en.x-b.x, en.y-b.y) < 22*scaleF){
+          en.hp = 0; if(!b.pierce) b.hit = true; score += 2; scoreNum.textContent = score; sfx.hit();
+        }
+      });
+    });
+    enemies = enemies.filter(en => en.hp > 0 && en.x > -50);
+
+    // tough milestone enemies
+    toughEnemies.forEach(t => {
+      if(t.entering){
+        t.x -= 2;
+        if(t.x <= W - 90) t.entering = false;
+      } else {
+        t.x -= d.obstacleSpeed * 0.5;
+        t.y += t.vy;
+        if(t.y < H*0.15 || t.y > H*0.85) t.vy *= -1;
+        t.shootTimer--;
+        if(t.shootTimer <= 0){
+          t.shootTimer = Math.max(30, 60 - score*0.15);
+          const ang = Math.atan2(plane.y - t.y, plane.x - t.x);
+          enemyBullets.push({ x: t.x, y: t.y, vx: Math.cos(ang)*d.enemyBulletSpeed, vy: Math.sin(ang)*d.enemyBulletSpeed });
+        }
+      }
+      if(Math.hypot(t.x-plane.x, t.y-plane.y) < 30*scaleF) crashed = true;
+    });
+    bullets.forEach(b => {
+      toughEnemies.forEach(t => {
+        if(t.hp > 0 && !b.hit && Math.hypot(t.x-b.x, t.y-b.y) < 30*scaleF){
+          t.hp--; if(!b.pierce) b.hit = true;
+          sfx.hit();
+          if(t.hp <= 0){ score += 10; scoreNum.textContent = score; sfx.explosion(); }
+        }
+      });
+    });
+    toughEnemies = toughEnemies.filter(t => t.hp > 0 && t.x > -80);
+
+    // misiles teledirigidos: tras un breve tramo recto, giran hacia el enemigo más cercano
+    bullets.forEach(b => {
+      if(b.type === 'missile'){
+        b.age = (b.age||0) + 1;
+        if(b.age > 8){
+          let target = null, bestDist = Infinity;
+          enemies.forEach(en => { const dist = Math.hypot(en.x-b.x, en.y-b.y); if(dist < bestDist){ bestDist = dist; target = en; } });
+          toughEnemies.forEach(t => { const dist = Math.hypot(t.x-b.x, t.y-b.y); if(dist < bestDist){ bestDist = dist; target = t; } });
+          if(target){
+            const desired = Math.atan2(target.y-b.y, target.x-b.x);
+            const cur = Math.atan2(b.vy, b.vx);
+            let diff = desired - cur;
+            while(diff > Math.PI) diff -= Math.PI*2;
+            while(diff < -Math.PI) diff += Math.PI*2;
+            const turn = Math.max(-0.14, Math.min(0.14, diff));
+            const newAng = cur + turn;
+            const speed = Math.hypot(b.vx, b.vy);
+            b.vx = Math.cos(newAng) * speed;
+            b.vy = Math.sin(newAng) * speed;
+          }
+        }
+      }
+    });
+
+    // bullets
+    bullets.forEach(b => { b.x += b.vx; b.y += b.vy; });
+    bullets = bullets.filter(b => !b.hit && b.x < W+20 && b.x > -30 && b.y > -30 && b.y < H+30);
+
+    enemyBullets.forEach(b => { b.x += b.vx; b.y += b.vy; });
+    enemyBullets = enemyBullets.filter(b => b.x > -20 && b.x < W+20 && b.y > -20 && b.y < H+20);
+    enemyBullets.forEach(b => {
+      if(Math.hypot(b.x-plane.x, b.y-plane.y) < 15*scaleF) crashed = true;
+    });
+
+    if(crashed){ gameOver(); }
+  }
+
+  // ---------- DRAW ----------
+  function drawBackground(){
+    const g = ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0, THEME.sky[0]);
+    g.addColorStop(1, THEME.sky[1]);
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,W,H);
+
+    particles.forEach(p => {
+      ctx.save();
+      ctx.globalAlpha = 0.75;
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, p.size*2.2, p.size, 0,0,Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  function drawObstacle(o){
+    ctx.fillStyle = THEME.obstacle;
+    ctx.strokeStyle = THEME.obstacleDark;
+    ctx.lineWidth = 3;
+    ctx.fillRect(o.x, 0, o.w, o.gapY);
+    ctx.strokeRect(o.x, 0, o.w, o.gapY);
+    ctx.fillRect(o.x, o.gapY+o.gap, o.w, H-(o.gapY+o.gap));
+    ctx.strokeRect(o.x, o.gapY+o.gap, o.w, H-(o.gapY+o.gap));
+    ctx.fillStyle = THEME.obstacleDark;
+    ctx.fillRect(o.x-4, o.gapY-16, o.w+8, 16);
+    ctx.fillRect(o.x-4, o.gapY+o.gap, o.w+8, 16);
+  }
+
+  function drawPlane(){
+    ctx.save();
+    ctx.translate(plane.x, plane.y);
+    ctx.rotate(plane.rot);
+    ctx.scale(scaleF, scaleF);
+
+    // ala superior: azul claro y brillante
+    ctx.fillStyle = '#5AC8FA';
+    ctx.beginPath();
+    ctx.moveTo(20,0);
+    ctx.lineTo(-18,-11);
+    ctx.lineTo(-8,0);
+    ctx.closePath();
+    ctx.fill();
+
+    // ala inferior: azul oscuro, para dar volumen y contraste
+    ctx.fillStyle = '#0B3D91';
+    ctx.beginPath();
+    ctx.moveTo(20,0);
+    ctx.lineTo(-8,0);
+    ctx.lineTo(-18,11);
+    ctx.closePath();
+    ctx.fill();
+
+    // contorno general bien marcado en azul muy oscuro
+    ctx.strokeStyle = '#062A63';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(20,0);
+    ctx.lineTo(-18,-11);
+    ctx.lineTo(-8,0);
+    ctx.lineTo(-18,11);
+    ctx.closePath();
+    ctx.stroke();
+
+    // línea de doblez central, azul clarito para dar el efecto de papel
+    ctx.strokeStyle = '#BEE6FF';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-8,0); ctx.lineTo(20,0);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function drawEnemy(en){
+    ctx.save();
+    ctx.translate(en.x, en.y);
+    ctx.scale(scaleF, scaleF);
+    ctx.fillStyle = '#d43b3b';
+    ctx.beginPath();
+    ctx.moveTo(-16,0); ctx.lineTo(14,-9); ctx.lineTo(14,9);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#7a1e1e';
+    ctx.fillRect(-4,-3,8,6);
+    ctx.restore();
+  }
+
+  function drawToughEnemy(t){
+    ctx.save();
+    ctx.translate(t.x, t.y);
+    ctx.scale(scaleF, scaleF);
+    ctx.fillStyle = '#5c2a7a';
+    ctx.beginPath();
+    ctx.moveTo(-34,0); ctx.lineTo(24,-20); ctx.lineTo(34,0); ctx.lineTo(24,20);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffcf5c';
+    ctx.beginPath(); ctx.arc(4,0,8,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    // hp bar over it
+    const bw = 46;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(t.x-bw/2, t.y-40*scaleF, bw, 6);
+    ctx.fillStyle = '#ff4d4d';
+    ctx.fillRect(t.x-bw/2, t.y-40*scaleF, bw*Math.max(0,t.hp/t.maxHp), 6);
+  }
+
+  function drawBullets(){
+    bullets.forEach(b => {
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      const ang = Math.atan2(b.vy, b.vx);
+      ctx.rotate(ang);
+      if(b.type === 'laser'){
+        const grad = ctx.createLinearGradient(-26,0,10,0);
+        grad.addColorStop(0, 'rgba(124,252,154,0)');
+        grad.addColorStop(1, '#7CFC9A');
+        ctx.fillStyle = grad;
+        ctx.fillRect(-26, -3, 36, 6);
+      } else if(b.type === 'missile'){
+        ctx.fillStyle = '#ffb26b';
+        ctx.beginPath();
+        ctx.moveTo(9,0); ctx.lineTo(-6,-4); ctx.lineTo(-6,4);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = 'rgba(255,138,61,0.55)';
+        ctx.beginPath(); ctx.ellipse(-10,0,7,2.4,0,0,Math.PI*2); ctx.fill();
+      } else if(b.type === 'spread'){
+        ctx.fillStyle = '#c78bff';
+        ctx.beginPath(); ctx.arc(0,0,4.2,0,Math.PI*2); ctx.fill();
+      } else {
+        ctx.fillStyle = '#ffe45c';
+        ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    });
+    ctx.fillStyle = '#ff5c5c';
+    enemyBullets.forEach(b => {
+      ctx.beginPath(); ctx.arc(b.x,b.y,4.5,0,Math.PI*2); ctx.fill();
+    });
+  }
+
+  function draw(){
+    drawBackground();
+    if(state === 'playing' || state === 'dead'){
+      obstacles.forEach(drawObstacle);
+      enemies.forEach(drawEnemy);
+      toughEnemies.forEach(drawToughEnemy);
+      drawBullets();
+      drawPlane();
+    }
+  }
+
+  function loop(){
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  resizeCanvas();
+  loop();
+})();
+
+// Registra el service worker para que la app funcione offline e instale bien como PWA
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
